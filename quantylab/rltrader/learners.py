@@ -6,13 +6,14 @@ import threading
 import time
 import json
 import numpy as np
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 from quantylab.rltrader.environment import Environment
 from quantylab.rltrader.agent import Agent
 from quantylab.rltrader.networks import Network, DNN, LSTMNetwork, CNN
 from quantylab.rltrader.visualizer import Visualizer
 from quantylab.rltrader import utils
 from quantylab.rltrader import settings
+import sys, signal
 
 
 logger = logging.getLogger(settings.LOGGER_NAME)
@@ -30,6 +31,7 @@ class ReinforcementLearner:
                 balance=100000000, start_epsilon=1,
                 value_network=None, policy_network=None,
                 output_path='', reuse_models=True):
+
         # 인자 확인
         assert min_trading_price > 0
         assert max_trading_price > 0
@@ -203,13 +205,15 @@ class ReinforcementLearner:
             initial_balance=self.agent.initial_balance, 
             pvs=self.memory_pv,
         )
-        self.visualizer.save(os.path.join(self.epoch_summary_dir, f'epoch_summary_{epoch_str}.png'))
+        # self.visualizer.save(os.path.join(self.epoch_summary_dir, f'epoch_summary_{epoch_str}.png'))
 
-    def run(self, learning=True):
+    def run(self, learning=True, stop=lambda: False):
         info = (
             f'[{self.stock_code}] RL:{self.rl_method} NET:{self.net} '
             f'LR:{self.lr} DF:{self.discount_factor} '
         )
+
+        print("start learn", len(self.chart_data))
         with self.lock:
             logger.debug(info)
 
@@ -232,9 +236,16 @@ class ReinforcementLearner:
         max_portfolio_value = 0
         epoch_win_cnt = 0
 
+        learn_progress = tqdm(range(self.num_epoches), position=0)
+        epoch_progress = tqdm(range(len(self.training_data)), position=1)
         # 에포크 반복
-        for epoch in tqdm(range(self.num_epoches)):
+        for epoch in range(len(learn_progress)):
+
+            if stop():
+                break
+
             time_start_epoch = time.time()
+
 
             # step 샘플을 만들기 위한 큐
             q_sample = collections.deque(maxlen=self.num_steps)
@@ -248,7 +259,9 @@ class ReinforcementLearner:
             else:
                 epsilon = self.start_epsilon
 
-            for i in tqdm(range(len(self.training_data)), leave=False):
+            epoch_progress.refresh()
+            epoch_progress.reset()
+            for i in range(len(epoch_progress)):
                 # 샘플 생성
                 next_sample = self.build_sample()
                 if next_sample is None:
@@ -258,7 +271,6 @@ class ReinforcementLearner:
                 q_sample.append(next_sample)
                 if len(q_sample) < self.num_steps:
                     continue
-
                 # 가치, 정책 신경망 예측
                 pred_value = None
                 pred_policy = None
@@ -266,13 +278,13 @@ class ReinforcementLearner:
                     pred_value = self.value_network.predict(list(q_sample))
                 if self.policy_network is not None:
                     pred_policy = self.policy_network.predict(list(q_sample))
-                
+
                 # 신경망 또는 탐험에 의한 행동 결정
                 action, confidence, exploration = \
                     self.agent.decide_action(pred_value, pred_policy, epsilon)
 
                 # 결정한 행동을 수행하고 보상 획득
-                reward = self.agent.act(action, confidence)
+                reward = self.agent.act2(action, confidence)
 
                 # 행동 및 행동에 대한 결과를 기억
                 self.memory_sample.append(list(q_sample))
@@ -291,6 +303,9 @@ class ReinforcementLearner:
                 self.batch_size += 1
                 self.itr_cnt += 1
                 self.exploration_cnt += 1 if exploration else 0
+                epoch_progress.update()
+            learn_progress.update()
+
 
             # 에포크 종료 후 학습
             if learning:
@@ -308,7 +323,7 @@ class ReinforcementLearner:
                 f'Loss:{self.loss:.6f} ET:{elapsed_time_epoch:.4f}')
 
             # 에포크 관련 정보 가시화
-            if self.num_epoches == 1 or (epoch + 1) % int(self.num_epoches / 10) == 0:
+            if self.num_epoches == 1 or (epoch + 1) % int(self.num_epoches / 100) == 0:
                 self.visualize(epoch_str, self.num_epoches, epsilon)
 
             # 학습 관련 정보 갱신
@@ -527,23 +542,30 @@ class A3CLearner(ReinforcementLearner):
             self.learners.append(learner)
 
     def run(self, learning=True):
+        try:
+            stop_threads = False
+            threads = []
+            for learner in self.learners:
+                th = threading.Thread(
+                    target=learner.run, kwargs={'learning': learning, "stop": lambda: stop_threads}
+                )
+                threads.append(th)
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+        except (KeyboardInterrupt, SystemExit):
+            # print('\n! Received keyboard interrupt, quitting threads.\n')
+            stop_threads = True
+
+
+    def predict(self):
         threads = []
         for learner in self.learners:
-            threads.append(threading.Thread(
-                target=learner.run, daemon=True, kwargs={'learning': learning}
-            ))
+            threads.append(threading.Thread(target=learner.predict, daemon=True))
         for thread in threads:
             thread.start()
         for thread in threads:
             thread.join()
 
-    def predict(self):
-        threads = []
-        for learner in self.learners:
-            threads.append(threading.Thread(
-                target=learner.predict, daemon=True
-            ))
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
+#%%

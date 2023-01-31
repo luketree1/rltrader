@@ -1,7 +1,8 @@
 import os
 import pandas as pd
 import numpy as np
-
+from datetime import datetime
+import time
 from quantylab.rltrader import settings
 
 
@@ -174,6 +175,9 @@ def preprocess(data, ver='v1'):
 
 
 def load_data(code, date_from, date_to, ver='v2'):
+
+    if ver == "v9":
+        return load_data_v9(code, date_from, date_to, ver)
     if ver in ['v3', 'v4']:
         return load_data_v3_v4(code, date_from, date_to, ver)
 
@@ -214,7 +218,22 @@ def load_data(code, date_from, date_to, ver='v2'):
     
     return chart_data, training_data
 
+def load_data_v9(code, date_from, date_to, ver):
+    df = pd.read_csv(os.path.join(settings.BASE_DIR, 'data', ver, code+'-1s-2022-11.csv'), header=None)
 
+    df.columns = ["date", "open", "high", "low","close","volume","close_time","quote_volume","number_of_trades","taker_buy_base_volume","taker_buy_quote_volume","unused"]
+
+    from_date = datetime.strptime(date_from, '%Y%m%d%H%M%S')
+    from_date = time.mktime(from_date.timetuple())*1000
+    to_date = datetime.strptime(date_to, '%Y%m%d%H%M%S')
+    to_date = time.mktime(to_date.timetuple())*1000
+    print(from_date, to_date)
+    df = df[(df['date'] >= from_date) & (df['date'] <= to_date)]
+    df = df.fillna(method='ffill').reset_index(drop=True)
+    df["taker_sell_quote_volume"] = df["quote_volume"]- df["taker_buy_quote_volume"]
+    training_data_column  = ["open", "high", "low","close","volume","quote_volume","number_of_trades","taker_buy_quote_volume","taker_sell_quote_volume"]
+    del df["unused"]
+    return df[COLUMNS_CHART_DATA], df[training_data_column]
 def load_data_v3_v4(code, date_from, date_to, ver):
     columns = None
     if ver == 'v3':
@@ -258,3 +277,5 @@ def load_data_v3_v4(code, date_from, date_to, ver):
     training_data = df[columns]
 
     return chart_data, training_data
+
+#%%

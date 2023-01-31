@@ -1,14 +1,14 @@
+
 import threading
+
 import numpy as np
 import matplotlib.pyplot as plt
-plt.switch_backend('agg')
-
 from mplfinance.original_flavor import candlestick_ohlc
 from quantylab.rltrader.agent import Agent
 
-
 lock = threading.Lock()
-
+plt.rcParams['figure.dpi'] = 300
+plt.rcParams['figure.figsize'] = [6, 5]
 
 class Visualizer:
     COLORS = ['r', 'b', 'g']
@@ -28,8 +28,9 @@ class Visualizer:
         self.title = title
         with lock:
             # 캔버스를 초기화하고 5개의 차트를 그릴 준비
-            self.fig, self.axes = plt.subplots(
-                nrows=5, ncols=1, facecolor='w', sharex=True)
+            self.fig, self.axes = plt.subplots(nrows=5, ncols=1, facecolor='w', sharex=True)
+            # self.fig.set_figwidth(20)
+            # self.fig.set_figheight(8)
             for ax in self.axes:
                 # 보기 어려운 과학적 표기 비활성화
                 ax.get_xaxis().get_major_formatter() \
@@ -38,6 +39,7 @@ class Visualizer:
                     .set_scientific(False)
                 # y axis 위치 오른쪽으로 변경
                 ax.yaxis.tick_right()
+                # ax.axis('scaled')
             # 차트 1. 일봉 차트
             self.axes[0].set_ylabel('Env.')  # y 축 레이블 표시
             x = np.arange(len(chart_data))
@@ -54,6 +56,8 @@ class Visualizer:
             self.x = np.arange(len(chart_data['date']))
             self.xticks = chart_data.index[[0, -1]]
             self.xlabels = chart_data.iloc[[0, -1]]['date']
+
+
             
     def plot(self, epoch_str=None, num_epoches=None, epsilon=None,
             action_list=None, actions=None, num_stocks=None,
@@ -72,7 +76,7 @@ class Visualizer:
             for action, color in zip(action_list, self.COLORS):
                 for i in self.x[actions == action]:
                     # 배경 색으로 행동 표시
-                    self.axes[1].axvline(i, color=color, alpha=0.1)
+                    self.axes[1].axvline(i, color=color, alpha=0.3)
             self.axes[1].plot(self.x, num_stocks, '-k')  # 보유 주식 수 그리기
 
             # 차트 3. 가치 신경망
@@ -125,8 +129,15 @@ class Visualizer:
             # 에포크 및 탐험 비율
             self.fig.suptitle(f'{self.title}\nEPOCH:{epoch_str}/{num_epoches} EPSILON:{epsilon:.2f}')
             # 캔버스 레이아웃 조정
-            self.fig.tight_layout()
+            self.fig.set_tight_layout(True)
             self.fig.subplots_adjust(top=0.85)
+
+
+            self.fig.canvas.draw()
+            plt.show()
+            self.fig.canvas.flush_events()
+
+
 
     def clear(self, xlim):
         with lock:
@@ -152,3 +163,5 @@ class Visualizer:
     def save(self, path):
         with lock:
             self.fig.savefig(path)
+
+#%%
