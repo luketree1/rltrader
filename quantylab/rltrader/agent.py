@@ -5,10 +5,10 @@ from quantylab.rltrader import utils
 class Agent:
     # 에이전트 상태가 구성하는 값 개수
     # 주식 보유 비율, 현재 손익, 평균 매수 단가 대비 등락률
-    STATE_DIM = 4
+    STATE_DIM = 5
 
     # 매매 수수료 및 세금
-    TRADING_CHARGE = 0.0000 # 거래 수수료 0.015%
+    TRADING_CHARGE = 0.000001 # 거래 수수료 0.015%
     # TRADING_CHARGE = 0.00011  # 거래 수수료 0.011%
     # TRADING_CHARGE = 0  # 거래 수수료 미적용
     # TRADING_TAX = 0.0025  # 거래세 0.25%
@@ -39,6 +39,7 @@ class Agent:
         self.total_long_position_cost = 0
         self.total_short_position = 0
         self.total_short_position_cost = 0
+        self.action_credit = 10
 
         # 포트폴리오 가치: balance + num_stocks * {현재 주식 가격}
         # 포트폴리오 가치: balance + unrealized_profit -> (position 수 * (cur price - entry price)
@@ -67,6 +68,7 @@ class Agent:
         self.ratio_hold = 0
         self.profitloss = 0
         self.avg_buy_price = 0
+        self.action_credit = 10
 
     def set_balance(self, balance):
         self.initial_balance = balance
@@ -79,6 +81,7 @@ class Agent:
             self.profitloss,
             self.num_buy,
             self.num_hold,
+            self.action_credit
             # self.num_stocks,
             # (self.environment.get_price() / self.avg_buy_price) - 1 \
                 # if self.avg_buy_price > 0 else 0
@@ -145,6 +148,7 @@ class Agent:
             / self.environment.get_price()
 
     def act2(self, action, confidence):
+        self.action_credit += 1
         curr_price = self.environment.get_price()
         trading_unit = self.decide_trading_unit(confidence)
 
@@ -153,6 +157,15 @@ class Agent:
 
         if action == Agent.ACTION_SELL and self.position * curr_price < -self.portfolio_value:
             action = Agent.ACTION_HOLD
+
+
+        if action == Agent.ACTION_SELL or action == Agent.ACTION_BUY:
+
+            credit = self.action_credit -5
+            if credit < 0:
+                action = Agent.ACTION_HOLD
+            else:
+                self.action_credit = credit
 
         if action == Agent.ACTION_BUY:
             self.total_long_position += trading_unit

@@ -11,7 +11,7 @@ plt.rcParams['figure.dpi'] = 300
 plt.rcParams['figure.figsize'] = [6, 5]
 
 class Visualizer:
-    COLORS = ['r', 'b', 'g']
+    COLORS = ['g', 'r', 'w']
 
     def __init__(self):
         self.canvas = None
@@ -47,7 +47,7 @@ class Visualizer:
             ohlc = np.hstack((
                 x.reshape(-1, 1), np.array(chart_data)[:, 1:-1]))
             # 양봉은 빨간색으로 음봉은 파란색으로 표시
-            candlestick_ohlc(self.axes[0], ohlc, colorup='r', colordown='b')
+            candlestick_ohlc(self.axes[0], ohlc, colorup='g', colordown='r')
             # 거래량 가시화
             ax = self.axes[0].twinx()
             volume = np.array(chart_data)[:, -1].tolist()
@@ -86,7 +86,7 @@ class Visualizer:
                     # 배경 그리기
                     for idx in self.x:
                         if max_actions[idx] == action:
-                            self.axes[2].axvline(idx, color=color, alpha=0.1)
+                            self.axes[2].axvline(idx, color=color, alpha=0.2)
                     # 가치 신경망 출력 그리기
                     self.axes[2].plot(self.x, outvals_value[:, action], 
                         color=color, linestyle='-')
@@ -94,7 +94,7 @@ class Visualizer:
             # 차트 4. 정책 신경망
             # 탐험을 노란색 배경으로 그리기
             for exp_idx in exps:
-                self.axes[3].axvline(exp_idx, color='y')
+                self.axes[3].axvline(exp_idx, color='y', alpha=1)
             # 행동을 배경으로 그리기
             _outvals = outvals_policy if len(outvals_policy) > 0 else outvals_value
             for idx, outval in zip(self.x, _outvals):
@@ -107,7 +107,7 @@ class Visualizer:
                     color = self.COLORS[1]  # 매도 파란색
                 elif outval.argmax() == Agent.ACTION_HOLD:
                     color = self.COLORS[2]  # 관망 초록색
-                self.axes[3].axvline(idx, color=color, alpha=0.1)
+                self.axes[3].axvline(idx, color=color, alpha=0.2)
             # 정책 신경망의 출력 그리기
             if len(outvals_policy) > 0:
                 for action, color in zip(action_list, self.COLORS):
