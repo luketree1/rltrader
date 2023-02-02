@@ -8,7 +8,7 @@ class Agent:
     STATE_DIM = 5
 
     # 매매 수수료 및 세금
-    TRADING_CHARGE = 0.000001 # 거래 수수료 0.015%
+    TRADING_CHARGE = 0.000001  # 거래 수수료 0.015%
     # TRADING_CHARGE = 0.00011  # 거래 수수료 0.011%
     # TRADING_CHARGE = 0  # 거래 수수료 미적용
     # TRADING_TAX = 0.0025  # 거래세 0.25%
@@ -84,7 +84,7 @@ class Agent:
             self.action_credit
             # self.num_stocks,
             # (self.environment.get_price() / self.avg_buy_price) - 1 \
-                # if self.avg_buy_price > 0 else 0
+            # if self.avg_buy_price > 0 else 0
         )
 
     def decide_action(self, pred_value, pred_policy, epsilon):
@@ -148,7 +148,7 @@ class Agent:
             / self.environment.get_price()
 
     def act2(self, action, confidence):
-        self.action_credit += 1
+        # self.action_credit += 1
         curr_price = self.environment.get_price()
         trading_unit = self.decide_trading_unit(confidence)
 
@@ -158,14 +158,12 @@ class Agent:
         if action == Agent.ACTION_SELL and self.position * curr_price < -self.portfolio_value:
             action = Agent.ACTION_HOLD
 
-
-        if action == Agent.ACTION_SELL or action == Agent.ACTION_BUY:
-
-            credit = self.action_credit -5
-            if credit < 0:
-                action = Agent.ACTION_HOLD
-            else:
-                self.action_credit = credit
+        # if action == Agent.ACTION_SELL or action == Agent.ACTION_BUY:
+        #     credit = self.action_credit - 5
+        #     if credit < 0:
+        #         action = Agent.ACTION_HOLD
+        #     else:
+        #         self.action_credit = credit
 
         if action == Agent.ACTION_BUY:
             self.total_long_position += trading_unit
@@ -184,18 +182,23 @@ class Agent:
 
         long_profit = 0
         if self.total_long_position != 0:
-            long_profit = self.total_long_position*(curr_price - (self.total_long_position_cost / self.total_long_position))
+            long_profit = self.total_long_position * (
+                        curr_price - (self.total_long_position_cost / self.total_long_position))
 
         short_profit = 0
         if self.total_short_position != 0:
-            short_profit = -1 * self.total_short_position*(curr_price - (self.total_short_position_cost / self.total_short_position))
+            short_profit = -1 * self.total_short_position * (
+                        curr_price - (self.total_short_position_cost / self.total_short_position))
 
         hold_reward = 0
         if action == Agent.ACTION_HOLD:
             hold_reward = 0.0001
         self.portfolio_value = self.balance + short_profit + long_profit
+
+        turnover = (self.total_short_position + self.total_long_position) / self.initial_balance
+
         self.profitloss = self.portfolio_value / self.initial_balance - 1
-        return self.profitloss
+        return self.profitloss - turnover * 0.1
 
     def act(self, action, confidence):
         if not self.validate_action(action):
@@ -261,6 +264,7 @@ class Agent:
         # 포트폴리오 가치 갱신
         self.portfolio_value = self.balance + curr_price * self.num_stocks
         self.profitloss = self.portfolio_value / self.initial_balance - 1
+
         return self.profitloss
 
-#%%
+# %%

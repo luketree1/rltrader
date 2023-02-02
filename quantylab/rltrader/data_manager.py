@@ -1,8 +1,11 @@
 import os
-import pandas as pd
-import numpy as np
-from datetime import datetime
 import time
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+import talib as ta
+
 from quantylab.rltrader import settings
 
 COLUMNS_CHART_DATA = ['date', 'open', 'high', 'low', 'close', 'volume']
@@ -299,41 +302,102 @@ def load_data_v9(code, date_from, date_to, ver):
     to_date = datetime.strptime(date_to, '%Y%m%d%H%M%S')
     to_date = time.mktime(to_date.timetuple()) * 1000
     print(from_date, to_date)
+    close = df['close']
+    volume = df['volume']
     df = df[(df['date'] >= from_date) & (df['date'] <= to_date)]
     df = df.fillna(method='ffill').reset_index(drop=True)
-    df["taker_sell_quote_volume"] = df["quote_volume"] - df["taker_buy_quote_volume"]
-    df["buy_sell_ratio"] = df["taker_buy_quote_volume"] / df["taker_sell_quote_volume"] -1
-    df["open_close"] = df["close"] / df["open"] -1
-    df["high_low"] = df["high"] / df["low"] -1
 
-    df["close_sma_3"] = df['close'].rolling(window=3).mean() / df['close'] - 1
-    df["close_sma_5"] =  df['close'].rolling(window=5).mean() / df['close'] - 1
-    df["close_sma_15"] =  df['close'].rolling(window=15).mean() / df['close'] - 1
-    df["close_sma_30"] =  df['close'].rolling(window=30).mean() / df['close'] - 1
-    df["close_sma_60"] =  df['close'].rolling(window=60).mean() / df['close'] - 1
+    df["buy_sell_ratio"] = df["taker_buy_quote_volume"] / df["quote_volume"] - 0.5
+    df["open_close"] = df["close"] / df["open"] - 1
+    df["high_low"] = df["high"] / df["low"] - 1
 
-    df["volume_sma_3"] = df['quote_volume'].rolling(window=3).mean() / df['quote_volume'] -1
-    df["volume_sma_5"] = df['quote_volume'].rolling(window=5).mean() / df['quote_volume'] -1
-    df["volume_sma_15"] = df['quote_volume'].rolling(window=15).mean() / df['quote_volume'] -1
-    df["volume_sma_30"] = df['quote_volume'].rolling(window=30).mean() / df['quote_volume'] -1
-    df["volume_sma_60"] = df['quote_volume'].rolling(window=60).mean() / df['quote_volume'] -1
+    df["close_sma_2"] = ta.SMA(close, 2) / close - 1
+    df["close_sma_3"] = ta.SMA(close, 3) / close - 1
+    df["close_sma_5"] = ta.SMA(close, 5) / close - 1
+    df["close_sma_15"] = ta.SMA(close, 15) / close - 1
+    df["close_sma_30"] = ta.SMA(close, 30) / close - 1
+    df["close_sma_60"] = ta.SMA(close, 60) / close - 1
+
+    df["close_ema_2"] = ta.EMA(close, 2) / close - 1
+    df["close_ema_3"] = ta.EMA(close, 3) / close - 1
+    df["close_ema_5"] = ta.EMA(close, 5) / close - 1
+    df["close_ema_15"] = ta.EMA(close, 15) / close - 1
+    df["close_ema_30"] = ta.EMA(close, 30) / close - 1
+    df["close_ema_60"] = ta.EMA(close, 60) / close - 1
+
+    df["short_rsi"] = ta.RSI(close, 5) - 50
+    df["short_rsi_sma_2"] = ta.SMA(df["short_rsi"], 2)
+    df["short_rsi_sma_3"] = ta.SMA(df["short_rsi"], 3)
+    df["short_rsi_sma_5"] = ta.SMA(df["short_rsi"], 5)
+    df["short_rsi_sma_15"] = ta.SMA(df["short_rsi"], 15)
+    df["short_rsi_sma_30"] = ta.SMA(df["short_rsi"], 30)
+    df["short_rsi_sma_60"] = ta.SMA(df["short_rsi"], 60)
+
+    df["long_rsi"] = ta.RSI(close, 30) - 50
+    df["long_rsi_sma_2"] = ta.SMA(df["long_rsi"], 2)
+    df["long_rsi_sma_3"] = ta.SMA(df["long_rsi"], 3)
+    df["long_rsi_sma_5"] = ta.SMA(df["long_rsi"], 5)
+    df["long_rsi_sma_15"] = ta.SMA(df["long_rsi"], 15)
+    df["long_rsi_sma_30"] = ta.SMA(df["long_rsi"], 30)
+    df["long_rsi_sma_60"] = ta.SMA(df["long_rsi"], 60)
+
+    df["volume_sma_2"] = df['quote_volume'].rolling(window=2).mean() / df['quote_volume'] - 1
+    df["volume_sma_3"] = df['quote_volume'].rolling(window=3).mean() / df['quote_volume'] - 1
+    df["volume_sma_5"] = df['quote_volume'].rolling(window=5).mean() / df['quote_volume'] - 1
+    df["volume_sma_15"] = df['quote_volume'].rolling(window=15).mean() / df['quote_volume'] - 1
+    df["volume_sma_30"] = df['quote_volume'].rolling(window=30).mean() / df['quote_volume'] - 1
+    df["volume_sma_60"] = df['quote_volume'].rolling(window=60).mean() / df['quote_volume'] - 1
 
     training_data_column = [
-
         "open_close",
         "high_low",
+
+        "close_sma_2",
         "close_sma_3",
         "close_sma_5",
         "close_sma_15",
         "close_sma_30",
         "close_sma_60",
+
+        "close_ema_2",
+        "close_ema_3",
+        "close_ema_5",
+        "close_ema_15",
+        "close_ema_30",
+        "close_ema_60",
+
         "volume_sma_3",
         "volume_sma_5",
         "volume_sma_15",
         "volume_sma_30",
         "volume_sma_60",
-        "quote_volume",
-        "number_of_trades",
+
+        "short_rsi",
+        "short_rsi_sma_2",
+        "short_rsi_sma_3",
+        "short_rsi_sma_5",
+        "short_rsi_sma_15",
+        "short_rsi_sma_30",
+        "short_rsi_sma_60",
+
+        "long_rsi",
+        "long_rsi_sma_2",
+        "long_rsi_sma_3",
+        "long_rsi_sma_5",
+        "long_rsi_sma_15",
+        "long_rsi_sma_30",
+        "long_rsi_sma_60",
+
+        "volume_sma_2",
+        "volume_sma_3",
+        "volume_sma_5",
+        "volume_sma_15",
+        "volume_sma_30",
+        "volume_sma_60",
+
+        # "obv",
+        # "quote_volume",
+        # "number_of_trades",
         "buy_sell_ratio",
     ]
     del df["unused"]
